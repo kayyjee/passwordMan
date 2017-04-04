@@ -88,10 +88,8 @@ def unpad(paddedPass):
 def countEntries():
 	n=1
 	numEntries=int(db.passwordEntries.count())
-	print numEntries
 	while n<=numEntries:
 		a=db.passwordEntries.find_one({'id': int(n)})
-		print a
 		if a == None:
 			return n
 		n+=1
@@ -114,7 +112,7 @@ def add():
 		return
 	
 
-	option = raw_input('\nis this correct? \n\n%s%s\n %s%s\n %s%s\n\n[y/n]\n'\
+	option = raw_input('\nis this correct?\n\n%s%s\n %s%s\n %s%s\n\n[y/n]\n'\
 	 %('description:',description,'username:',username,'password: ','********'))
 
 	while (option != 'y' and option != 'n'):
@@ -164,7 +162,7 @@ def split(entry):
 def view():
 	
 	docArray =[]
-	for doc in db.passwordEntries.find({},{'id':1,'description':1, 'username':1, '_id':0}):
+	for doc in db.passwordEntries.find({},{'id':1,'description':1, 'username':1, '_id':0}).sort('id', 1):
 		docArray.append(dumps(doc))
 
 		
@@ -179,19 +177,73 @@ def view():
 	if option =='b':
 		return
 	if option =='v':
-		option = int(raw_input('enter id of password to view[1,2,3...]\n'))
+		try:
+			option = int(raw_input('enter id of password to view[1,2,3...]\n'))
+		except :
+			print 'not a valid entry'
+			return
 		entry= db.passwordEntries.find_one({'id': option}, {'password':1,'_id':0, 'option':1, 'salt':1})
 		encryptedPassword, decryptOption, salt = split(str(entry))
 		password = decrypt(encryptedPassword, decryptOption, salt)
 		print password
 	if option =='d':
-		option = int(raw_input('enter id of password to delete[1,2,3...]\n'))
+		try: 
+			option = int(raw_input('enter id of password to delete[1,2,3...]\n'))
+		except :
+			print 'not a valid entry'
+			return
 		entry= dumps(db.passwordEntries.find_one({'id': option}, {'_id':0, 'description':1, 'username':1}))
+		if entry =='null':
+			print 'not a valid entry'
+			return
 		print entry
 		confirm = raw_input('are you sure you want to delete this [y/n]\n')
 		if confirm =='y':
 			result = db.passwordEntries.delete_one({'id': option})
-			print result
+			print 'deleted'
+		elif confirm=='n':
+			return
+		else: 
+			print 'not a valid option'
+			return
+
+	if option == 'm':
+		try:
+			option = int(raw_input('enter id of password to modify[1,2,3...]\n'))
+		except: 
+			print 'not a valid entry'
+			return
+		entry= dumps(db.passwordEntries.find_one({'id': option}, {'_id':0, 'description':1, 'username':1}))
+		if entry =='null':
+			print 'not a valid entry'
+			return
+		print entry
+		choice=raw_input('modify what?\np=password, d=description, u=username\n')
+		if choice == 'd':
+			description = raw_input('enter new description: ')
+			result = db.passwordEntries.update({'id': option}, {'$set': {'description': description}})
+			print 'successfully updated'
+		elif choice == 'u':
+			username = raw_input('enter new username: ')
+			result = db.passwordEntries.update({'id': option}, {'$set': {'username': username}})
+			print 'successfully updated'
+		elif choice =='p':
+			hashAlgo, encryptedPass, salt = updatePass()
+			result = db.passwordEntries.update({'id': option}, {'$set': {'option': hashAlgo, 'password':encryptedPass, 'salt': salt}})
+			print 'successfully updated'
+	
+def updatePass():
+	temp = getpass.getpass('enter a password: ')
+	if len(temp) > paddedPassLen:
+		print 'max len is '+str(paddedPassLen)
+		return
+	password = getpass.getpass('please confirm your password:')
+	if temp != password:
+		print 'those did not match'
+		return
+	return hashtime(password);
+
+
 def insert(description,username,password,option,salt):
 	result = db.passwordEntries.insert_one(
 		{
