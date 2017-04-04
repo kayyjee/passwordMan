@@ -112,7 +112,7 @@ def add():
 		return
 	
 
-	option = raw_input('\nis this correct?\n\n%s%s\n %s%s\n %s%s\n\n[y/n]\n'\
+	option = raw_input('\nis this correct?\n\n%s%s\n%s%s\n%s%s\n\n[y/n]\n'\
 	 %('description:',description,'username:',username,'password: ','********'))
 
 	while (option != 'y' and option != 'n'):
@@ -228,7 +228,10 @@ def view():
 			result = db.passwordEntries.update({'id': option}, {'$set': {'username': username}})
 			print 'successfully updated'
 		elif choice =='p':
-			hashAlgo, encryptedPass, salt = updatePass()
+			try: 
+				hashAlgo, encryptedPass, salt = updatePass()
+			except:
+				return
 			result = db.passwordEntries.update({'id': option}, {'$set': {'option': hashAlgo, 'password':encryptedPass, 'salt': salt}})
 			print 'successfully updated'
 		else :
