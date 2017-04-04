@@ -231,7 +231,10 @@ def view():
 			hashAlgo, encryptedPass, salt = updatePass()
 			result = db.passwordEntries.update({'id': option}, {'$set': {'option': hashAlgo, 'password':encryptedPass, 'salt': salt}})
 			print 'successfully updated'
-	
+		else :
+			print 'not a valid entry'
+			return
+				
 def updatePass():
 	temp = getpass.getpass('enter a password: ')
 	if len(temp) > paddedPassLen:
