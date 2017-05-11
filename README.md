@@ -10,9 +10,7 @@ Description:
 
 Authenticates with master key.
 
-Hashes key with md5 or SHA256. Hash key is used as salt for other passwords.
-
-Encrypts passwords with AES.
+Hashes key with md5, SHA256 or BCrypt
 
 
 
