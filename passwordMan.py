@@ -4,7 +4,9 @@ from Crypto.Cipher import AES
 client = MongoClient()
 db = client.passwordMan
 import re
+import bcrypt
 import getpass
+import time
 import sys
 import hashlib
 import bson
@@ -43,15 +45,17 @@ def hashSHA256(salt):
 	global masterKey
 	return hashlib.sha256(salt + masterKey).digest()
 
-
+def hashBcrypt(salt):
+	global masterKey
+	return bcrypt.hashpw(masterKey, salt)
 
 
 
 def hashtime(password):
 	option = raw_input('which algorithm to hash key?\
-		\n 1 = MD5\n 2 = SHA256\n')
-	while (option != '1' and option != '2'):
-		option = raw_input('enter [1 or 2]\n')
+		\n 1 = MD5\n 2 = SHA256\n 3 = BCRYPT\n')
+	while (option != '1' and option != '2' and option !='3'):
+		option = raw_input('enter [1, 2 or 3]\n')
 	
 	#salt=uuid.uuid4().hex
 	global IV
@@ -60,7 +64,11 @@ def hashtime(password):
 		cipher = AES.new(hashMD5(salt), AES.MODE_CFB, IV)
 	elif option =='2':
 		cipher = AES.new(hashSHA256(salt), AES.MODE_CFB, IV)
-
+	elif option== '3':
+		salt=bcrypt.gensalt(12)
+		key=hashBcrypt(salt)
+		bkey=key.ljust(32)[:32]
+		cipher = AES.new(bkey, AES.MODE_CFB, IV)
 	paddedPass=pad(password)
 	encryptedPass = bin(int(binascii.hexlify(cipher.encrypt(paddedPass)), 16))
 	return option, encryptedPass, salt
@@ -113,7 +121,7 @@ def add():
 	
 
 	option = raw_input('\nis this correct?\n\n%s%s\n%s%s\n%s%s\n\n[y/n]\n'\
-	 %('description:',description,'username:',username,'password: ','********'))
+	 %('description:',description,'username:',username,'password:','********'))
 
 	while (option != 'y' and option != 'n'):
 		option = raw_input('enter [y or n]')
@@ -133,9 +141,17 @@ def add():
 def decrypt(encryptedPassword, option, salt):
 	global IV
 	if option == '1':
+		start=time.time()
 		decipher = AES.new(hashMD5(salt), AES.MODE_CFB, IV)
+		end=time.time()
 	if option == '2':
+		start=time.time()
 		decipher = AES.new(hashSHA256(salt), AES.MODE_CFB, IV)
+		end=time.time()
+	if option =='3':
+		key =hashBcrypt(salt)
+		bkey=key.ljust(32)[:32]
+		decipher = AES.new(bkey, AES.MODE_CFB, IV)
 	a=binascii.unhexlify('%x' % int(encryptedPassword, 2))
 	return unpad(decipher.decrypt(a))
 	
@@ -185,7 +201,8 @@ def view():
 		entry= db.passwordEntries.find_one({'id': option}, {'password':1,'_id':0, 'option':1, 'salt':1})
 		encryptedPassword, decryptOption, salt = split(str(entry))
 		password = decrypt(encryptedPassword, decryptOption, salt)
-		print password
+
+		print '\n'+password+'\n'
 	if option =='d':
 		try: 
 			option = int(raw_input('enter id of password to delete[1,2,3...]\n'))
@@ -279,11 +296,14 @@ def authenticate():
 	global masterKey
 	storedVal=db.masterP.find_one({})
 	if storedVal==None:
-		masterKey = setupMaster();
-		salt = getSalt()
-		binMaster=bin(int(binascii.hexlify(hashlib.sha256(salt+masterKey).digest()), 16))
+		salt=bcrypt.gensalt(12)
+		key=hashBcrypt(salt)
+		bkey=key.ljust(32)[:32]
+		cipher = AES.new(bkey, AES.MODE_CFB, IV)
+		paddedPass=pad(setupMaster())
+		encryptedPass = bin(int(binascii.hexlify(cipher.encrypt(paddedPass)), 16))
 		result = db.masterP.insert_one({
-			"password": binMaster,
+			"password": encryptedPass,
 			"salt": salt
 			})
 
@@ -292,16 +312,21 @@ def authenticate():
 		key="password\': u\'"
 		before, key, after = str(storedVal).partition(key)
 		key="\'"
-		hashedMaster, key, after = after.partition(key)
+		encryptedMaster, key, after = after.partition(key)
 		key="salt\': u\'"
 		before, key, after = str(storedVal).partition(key)
 		key="\'"
 		salt, key, after = after.partition(key)
 
-		attempt =getpass.getpass('Enter the master key:')
-		binAttempt=bin(int(binascii.hexlify(hashlib.sha256(salt+attempt).digest()), 16))
+		attempt=getpass.getpass('Enter the master key:')
+		key =hashBcrypt(salt)
+		bkey=key.ljust(32)[:32]
+		decipher = AES.new(bkey, AES.MODE_CFB, IV)
+
+
 		
-		if hashedMaster != binAttempt:
+		print unpad(decipher.decrypt(binascii.unhexlify('%x' % int(encryptedMaster, 2))))
+		if unpad(decipher.decrypt(binascii.unhexlify('%x' % int(encryptedMaster, 2)))) != attempt:
 			print 'wrong'
 			exit(0)
 		else:
