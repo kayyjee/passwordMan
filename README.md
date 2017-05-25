@@ -1,16 +1,23 @@
 # passwordMan
 
-cmd line password manager I made for a cryptography course project
-
-* Requires mongodb 
-  Set db paramaters in line 5
+A cmd line password manager
 
 
-Description:
 
-Authenticates with master key.
+It encrypts your passwords and stores them in MongoDB.
+Authenticate with a root password.
 
-Hashes key with md5, SHA256 or BCrypt
+Given the option to View existing, Modify, Delete or Add a new password.
+
+Password is encrypted and stored in DB.
+
+
+
+* Requires mongodb
+  *Set the DB Paramaters in line 5
+
+
+
 
 
 
