@@ -1,6 +1,9 @@
 #!/usr/bin/env python
 from pymongo import MongoClient
+
+#pip install pycrypto
 from Crypto.Cipher import AES
+
 client = MongoClient()
 db = client.passwordMan
 import re
@@ -13,6 +16,8 @@ import bson
 from bson.json_util import dumps
 import uuid
 import binascii
+from pprint import pprint
+#import Crypto
 
 masterKey=''
 IV = 16 * '\x41' #A in hex
@@ -49,14 +54,11 @@ def hashBcrypt(salt):
 	global masterKey
 	return bcrypt.hashpw(masterKey, salt)
 
-
-
 def hashtime(password):
 	option = raw_input('which algorithm to hash key?\
 		\n 1 = MD5\n 2 = SHA256\n 3 = BCRYPT\n')
 	while (option != '1' and option != '2' and option !='3'):
 		option = raw_input('enter [1, 2 or 3]\n')
-	
 	#salt=uuid.uuid4().hex
 	global IV
 	salt = getSalt()
@@ -65,7 +67,7 @@ def hashtime(password):
 	elif option =='2':
 		cipher = AES.new(hashSHA256(salt), AES.MODE_CFB, IV)
 	elif option== '3':
-		salt=bcrypt.gensalt(12)
+		salt=bcrypt.gensalt(15)
 		key=hashBcrypt(salt)
 		bkey=key.ljust(32)[:32]
 		cipher = AES.new(bkey, AES.MODE_CFB, IV)
@@ -75,23 +77,20 @@ def hashtime(password):
 
 
 def pad(password):
-	global paddedPassLen 
+	global paddedPassLen
 	padding = paddedPassLen - len(password)
-	
 	for i in range(0,padding):
 		password+='a'
-		
 	return password+str(padding)
-	
+
 def unpad(paddedPass):
 	global paddedPassLen
 	if paddedPass[-2:-1] == 'a':
 		padding = paddedPass[-1:]
-	else: 
+	else:
 		padding = paddedPass[-2:]
 	x = paddedPassLen - int(padding)
 	return paddedPass[0:x]
-
 
 def countEntries():
 	n=1
@@ -105,7 +104,6 @@ def countEntries():
 
 
 def add():
-
 	description = raw_input('enter a description (gmail, facebook...):')
 	username = raw_input('enter a username:')
 	temp = getpass.getpass('enter a password: ')
@@ -118,7 +116,6 @@ def add():
 		print 'those did not match'
 		add();
 		return
-	
 
 	option = raw_input('\nis this correct?\n\n%s%s\n%s%s\n%s%s\n\n[y/n]\n'\
 	 %('description:',description,'username:',username,'password:','********'))
@@ -136,8 +133,6 @@ def add():
 		print 'cancelled'
 		add();
 
-
-
 def decrypt(encryptedPassword, option, salt):
 	global IV
 	if option == '1':
@@ -151,18 +146,19 @@ def decrypt(encryptedPassword, option, salt):
 	if option =='3':
 		key =hashBcrypt(salt)
 		bkey=key.ljust(32)[:32]
+		start=time.time()
 		decipher = AES.new(bkey, AES.MODE_CFB, IV)
+		end=time.time()
 	a=binascii.unhexlify('%x' % int(encryptedPassword, 2))
+	print str(float(end-start))+' seconds'
 	return unpad(decipher.decrypt(a))
-	
-
 
 def split(entry):
-	key ="u\'password\': u\'" 
+	key ="u\'password\': u\'"
 	before, key, after = entry.partition(key)
-	key ="\'" 
+	key ="\'"
 	encryptedPassword, key, after = after.partition(key)
-	
+
 	key="option\': u\'"
 	before, key, after = entry.partition(key)
 	key="\'"
@@ -176,14 +172,15 @@ def split(entry):
 	return encryptedPassword, decryptOption,salt
 
 def view():
-	
 	docArray =[]
 	for doc in db.passwordEntries.find({},{'id':1,'description':1, 'username':1, '_id':0}).sort('id', 1):
 		docArray.append(dumps(doc))
-
-		
+	print
 	for doc in docArray:
-		print doc
+		doc=doc.split(',')
+		print(doc[1].replace('"','') + '   '\
+                     +doc[0].replace('"', '').replace('{','') +'  '\
+                     +doc[2].replace('"', '').replace('}',''))
 	option =raw_input('\nv=view password, m=modify, d=delete, b=back, e=exit\n')
 	while (option != 'v' and option != 'm' and option != 'd' and option!='b' and option!='e'):
 		option = raw_input('please enter a valid option\n')
@@ -204,7 +201,7 @@ def view():
 
 		print '\n'+password+'\n'
 	if option =='d':
-		try: 
+		try:
 			option = int(raw_input('enter id of password to delete[1,2,3...]\n'))
 		except :
 			print 'not a valid entry'
@@ -220,14 +217,14 @@ def view():
 			print 'deleted'
 		elif confirm=='n':
 			return
-		else: 
+		else:
 			print 'not a valid option'
 			return
 
 	if option == 'm':
 		try:
 			option = int(raw_input('enter id of password to modify[1,2,3...]\n'))
-		except: 
+		except:
 			print 'not a valid entry'
 			return
 		entry= dumps(db.passwordEntries.find_one({'id': option}, {'_id':0, 'description':1, 'username':1}))
@@ -245,7 +242,7 @@ def view():
 			result = db.passwordEntries.update({'id': option}, {'$set': {'username': username}})
 			print 'successfully updated'
 		elif choice =='p':
-			try: 
+			try:
 				hashAlgo, encryptedPass, salt = updatePass()
 			except:
 				return
@@ -254,7 +251,7 @@ def view():
 		else :
 			print 'not a valid entry'
 			return
-				
+
 def updatePass():
 	temp = getpass.getpass('enter a password: ')
 	if len(temp) > paddedPassLen:
@@ -296,37 +293,27 @@ def authenticate():
 	global masterKey
 	storedVal=db.masterP.find_one({})
 	if storedVal==None:
-		salt=bcrypt.gensalt(12)
-		key=hashBcrypt(salt)
-		bkey=key.ljust(32)[:32]
-		cipher = AES.new(bkey, AES.MODE_CFB, IV)
-		paddedPass=pad(setupMaster())
-		encryptedPass = bin(int(binascii.hexlify(cipher.encrypt(paddedPass)), 16))
+		masterKey = setupMaster();
+		salt = getSalt()
+		binMaster=bin(int(binascii.hexlify(hashlib.sha256(salt+masterKey).digest()), 16))
 		result = db.masterP.insert_one({
-			"password": encryptedPass,
+			"password": binMaster,
 			"salt": salt
 			})
 
-	else: 
-		
+	else:
 		key="password\': u\'"
 		before, key, after = str(storedVal).partition(key)
 		key="\'"
-		encryptedMaster, key, after = after.partition(key)
+		hashedMaster, key, after = after.partition(key)
 		key="salt\': u\'"
 		before, key, after = str(storedVal).partition(key)
 		key="\'"
 		salt, key, after = after.partition(key)
 
 		attempt=getpass.getpass('Enter the master key:')
-		key =hashBcrypt(salt)
-		bkey=key.ljust(32)[:32]
-		decipher = AES.new(bkey, AES.MODE_CFB, IV)
-
-
-		
-		print unpad(decipher.decrypt(binascii.unhexlify('%x' % int(encryptedMaster, 2))))
-		if unpad(decipher.decrypt(binascii.unhexlify('%x' % int(encryptedMaster, 2)))) != attempt:
+		binAttempt=bin(int(binascii.hexlify(hashlib.sha256(salt+attempt).digest()), 16))
+		if hashedMaster != binAttempt:
 			print 'wrong'
 			exit(0)
 		else:
@@ -339,8 +326,3 @@ def authenticate():
 if __name__=='__main__':
 	while 1:
 		authenticate();
-	
-	
-	
-
-	
