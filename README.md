@@ -10,7 +10,6 @@ Description:
 
 Prerequisites 
 * Requires mongodb
-  *Set the DB Paramaters in line 5
 
 
 Use:
