@@ -3,40 +3,19 @@ from pymongo import MongoClient
 
 #pip install pycrypto
 from Crypto.Cipher import AES
+from bson.json_util import dumps
+from pprint import pprint
+import os,re,bcrypt,getpass,time,sys,hashlib,bson,uuid,binascii,pyperclip
 
 client = MongoClient()
 db = client.passwordMan
-import re
-import bcrypt
-import getpass
-import time
-import sys
-import hashlib
-import bson
-from bson.json_util import dumps
-import uuid
-import binascii
-from pprint import pprint
-#import Crypto
 
 masterKey=''
 IV = 16 * '\x41' #A in hex
 paddedPassLen = 25
 
 
-def main():
-	while 1:
-		option = raw_input('What would you like to do?\n1=View 2=Add 3=Exit\n')
-		while (option !='1' and option !='2' and option !='3'):
-			print 'not an option'
-			option = raw_input('What would you like to do?\n1=View 2=Add 3=Exit\n')
-		if option =='1':
-			view();
-		elif option =='2':
-			add();
-		elif option =='3':
-			print 'terminating'
-			exit()
+
 
 
 def getSalt():
@@ -136,21 +115,14 @@ def add():
 def decrypt(encryptedPassword, option, salt):
 	global IV
 	if option == '1':
-		start=time.time()
 		decipher = AES.new(hashMD5(salt), AES.MODE_CFB, IV)
-		end=time.time()
 	if option == '2':
-		start=time.time()
 		decipher = AES.new(hashSHA256(salt), AES.MODE_CFB, IV)
-		end=time.time()
 	if option =='3':
 		key =hashBcrypt(salt)
 		bkey=key.ljust(32)[:32]
-		start=time.time()
 		decipher = AES.new(bkey, AES.MODE_CFB, IV)
-		end=time.time()
 	a=binascii.unhexlify('%x' % int(encryptedPassword, 2))
-	print str(float(end-start))+' seconds'
 	return unpad(decipher.decrypt(a))
 
 def split(entry):
@@ -198,8 +170,8 @@ def view():
 		entry= db.passwordEntries.find_one({'id': option}, {'password':1,'_id':0, 'option':1, 'salt':1})
 		encryptedPassword, decryptOption, salt = split(str(entry))
 		password = decrypt(encryptedPassword, decryptOption, salt)
-
-		print '\n'+password+'\n'
+		pyperclip.copy(password)
+		print '\nadded to clipboard\n'
 	if option =='d':
 		try:
 			option = int(raw_input('enter id of password to delete[1,2,3...]\n'))
@@ -319,6 +291,21 @@ def authenticate():
 		else:
 			masterKey=attempt
 			main();
+
+
+def main():
+	while 1:
+		option = raw_input('What would you like to do?\n1=View 2=Add 3=Exit\n')
+		while (option !='1' and option !='2' and option !='3'):
+			print 'not an option'
+			option = raw_input('What would you like to do?\n1=View 2=Add 3=Exit\n')
+		if option =='1':
+			view();
+		elif option =='2':
+			add();
+		elif option =='3':
+			print 'terminating'
+			exit()
 
 
 
